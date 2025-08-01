@@ -1,5 +1,12 @@
 # GoodHabitLab
 
+![Django](https://img.shields.io/badge/Django-092E20?style=for-the-badge&logo=django&logoColor=green)
+![Django REST Framework](https://img.shields.io/badge/DRF-FF1709?style=for-the-badge&logo=django&logoColor=white)
+![Python](https://img.shields.io/badge/Python-3776AB?style=for-the-badge&logo=python&logoColor=white)
+![PostgreSQL](https://img.shields.io/badge/PostgreSQL-316192?style=for-the-badge&logo=postgresql&logoColor=white)
+![Git](https://img.shields.io/badge/Git-F05032?style=for-the-badge&logo=git&logoColor=white)
+![GitHub](https://img.shields.io/badge/GitHub-100000?style=for-the-badge&logo=github&logoColor=white)
+
 GoodHabitLab — это веб-приложение и Telegram-бот, разработанный для помощи пользователям в формировании и отслеживании
 полезных привычек. Проект включает в себя REST API для управления привычками, категории привычек, систему логов
 выполнения и уведомлений, а также интеграцию с Telegram для напоминаний и интерактивного взаимодействия.
@@ -13,158 +20,338 @@ GoodHabitLab — это веб-приложение и Telegram-бот, разр
 
 **Ключевые особенности:**
 
-* **Управление привычками:** Создание, редактирование, удаление, просмотр личных и публичных привычек.
-* **Категории привычек:** Классификация привычек для удобства организации и анализа.
-* **Логи выполнения:** Отслеживание прогресса выполнения привычек с возможностью пометки выполнения и откладывания.
-* **Уведомления Telegram:** Ежедневные напоминания и интерактивные кнопки для действий с привычками через Telegram-бот.
-* **Система вознаграждений:** Возможность устанавливать вознаграждения за выполнение привычек.
-* **Гибкая периодичность:** Поддержка ежедневных, еженедельных, ежемесячных и пользовательских расписаний для привычек.
-* **Аутентификация JWT:** Безопасная аутентификация пользователей с помощью JWT-токенов.
-* **Интерактивная документация API:** Используется `drf-spectacular` для генерации Swagger/OpenAPI документации.
+*   **Управление привычками:** Создание, редактирование, удаление, просмотр личных и публичных привычек.
+*   **Категории привычек:** Классификация привычек для удобства организации и анализа.
+*   **Логи выполнения:** Отслеживание прогресса выполнения привычек с возможностью пометки выполнения и откладывания.
+*   **Уведомления Telegram:** Ежедневные напоминания и интерактивные кнопки для действий с привычками через Telegram-бот.
+*   **Система вознаграждений:** Возможность устанавливать вознаграждения за выполнение привычек.
+*   **Гибкая периодичность:** Поддержка ежедневных, еженедельных, ежемесячных и пользовательских расписаний для привычек.
+*   **Аутентификация JWT:** Безопасная аутентификация пользователей с помощью JWT-токенов.
+*   **Интерактивная документация API:** Используется `drf-spectacular` для генерации Swagger/OpenAPI документации.
 
 ## Технологии
 
-* **Backend:** Python, Django REST Framework
-* **База данных:** PostgreSQL
-* **Очередь сообщений/Брокер:** Redis
-* **Асинхронные задачи:** Celery, `django-celery-beat`
-* **Telegram Bot API:** Интеграция через вебхуки
-* **Аутентификация:** `djangorestframework-simplejwt`
-* **Документация API:** `drf-spectacular`
-* **Загрузка данных:** `python-dotenv`
+*   **Backend:** Python, Django REST Framework
+*   **База данных:** PostgreSQL
+*   **Очередь сообщений/Брокер:** Redis
+*   **Асинхронные задачи:** Celery, `django-celery-beat`
+*   **Telegram Bot API:** Интеграция через вебхуки
+*   **Аутентификация:** `djangorestframework-simplejwt`
+*   **Документация API:** `drf-spectacular`
+*   **Загрузка данных:** `python-dotenv`
+
+## Структура проекта
+
+*   `config/`: Основные настройки проекта Django, корневые URL-адреса, конфигурация Celery.
+*   `users/`: Приложение для управления пользователями, их профилями. Содержит модели, сериализаторы, представления, 
+* URL-адреса и логику для аутентификации.
+*   `habits/`: Приложение для управления привычками, их категориями, логами выполнения и наградами. Содержит модели, 
+* сериализаторы, представления, URL-адреса и Celery задачи для напоминаний.
+*   `telegram_bot/`: Приложение для интеграции с Telegram Bot API, обработки вебхуков и отправки сообщений.
+*   `media/`: Директория для хранения загружаемых пользователями файлов (аватары, иконки привычек).
+*   `.venv/`: Виртуальное окружение Python (игнорируется Git).
+*   `.env`, `.env.example`: Файлы для хранения переменных окружения.
+*   `requirements.txt`: Список всех зависимостей проекта.
+*   `manage.py`: Утилита командной строки Django для выполнения административных задач.
+*   `celerybeat-schedule*`: Файлы, используемые Celery Beat для хранения состояния расписания задач (игнорируются Git).
 
 ## Запуск проекта
 
 Для успешного запуска проекта вам потребуются:
 
-* **Python 3.10+**
-* **Poetry** (рекомендуется для управления зависимостями)
-* **Docker Desktop** (для запуска PostgreSQL и Redis) или установленные PostgreSQL и Redis напрямую.
-* **ngrok** (для туннелирования локального сервера Telegram вебхукам)
+*   **Python 3.10+**
+*   **pip** (для управления зависимостями)
+*   **PostgreSQL** (установленный локально)
+*   **Redis** (установленный локально)
+*   **ngrok** (для туннелирования локального сервера Telegram вебхукам)
+
+## Установка и запуск
+
+Следуйте этим шагам, чтобы настроить и запустить проект локально.
 
 ### 1. Клонирование репозитория и установка зависимостей
 
 ```
 git clone <URL вашего репозитория>
 cd GoodHabitLab
-poetry install
+pip install -r requirements.txt
 ```
 
-### 2. Настройка переменных окружения
+### 2. Создание и активация виртуального окружения
 
-Создайте файл .env в корне проекта на основе .env.example и заполните его:
+Рекомендуется использовать виртуальное окружение для изоляции зависимостей проекта.
+
+Для Windows:
 
 ```
+    python -m venv .venv
+    .venv\Scripts\activate
+```
+
+Для macOS/Linux:
+
+```
+    python3 -m venv .venv
+    source .venv/bin/activate
+```
+
+### 3. Установка зависимостей
+
+Установите все необходимые библиотеки из requirements.txt:
+
+```
+    pip install -r requirements.txt
+```
+
+### 4. Настройка переменных окружения
+
+Создайте файл `.env` в корне проекта на основе `.env.example` и заполните его необходимыми значениями.
+Обязательно укажите:
+
 # .env
 
-SECRET_KEY=your_django_secret_key
-DEBUG=True
-ALLOWED_HOSTS=127.0.0.1,localhost
+* SECRET_KEY=your_django_secret_key
+* DEBUG=True
+* ALLOWED_HOSTS=127.0.0.1,localhost
 
-# Database settings (PostgreSQL)
-DB_NAME=goodhabitlab_db
-DB_USER=goodhabitlab_user
-DB_PASSWORD=goodhabitlab_password
-DB_HOST=localhost
-DB_PORT=5432
+**Настройки ДБ (PostgreSQL)**
+* DB_NAME=goodhabitlab_db
+* DB_USER=goodhabitlab_user
+* DB_PASSWORD=goodhabitlab_password
+* DB_HOST=localhost
+* DB_PORT=5432
 
-# Redis for Celery
-CELERY_BROKER_URL=redis://localhost:6379/0
-CELERY_RESULT_BACKEND=redis://localhost:6379/0
+* **Настройки Redis для Celery**:
+* CELERY_BROKER_URL=redis://localhost:6379/0
+* CELERY_RESULT_BACKEND=redis://localhost:6379/0
 
-# Telegram Bot API
-TELEGRAM_BOT_TOKEN=YOUR_TELEGRAM_BOT_TOKEN
-TELEGRAM_CHAT_ID=YOUR_TELEGRAM_CHAT_ID # (опционально, для тестовых отправок)
-BASE_URL=http://your_ngrok_url # Пример: https://abcdef123456.ngrok-free.app
-
-# Email settings (для сброса пароля)
-EMAIL_BACKEND=django.core.mail.backends.console.EmailBackend # Для разработки: выводит письма в консоль
-# EMAIL_BACKEND=django.core.mail.backends.smtp.EmailBackend # Для продакшена
-# EMAIL_HOST=smtp.example.com
-# EMAIL_PORT=587
-# EMAIL_USE_TLS=True
-# EMAIL_HOST_USER=your_email@example.com
-# EMAIL_HOST_PASSWORD=your_email_password
-```
+**Telegram Bot API**
+* TELEGRAM_BOT_TOKEN=YOUR_TELEGRAM_BOT_TOKEN
+* TELEGRAM_CHAT_ID=YOUR_TELEGRAM_CHAT_ID # (опционально, для тестовых отправок)
+* BASE_URL=http://your_ngrok_url # Пример: https://abcdef123456.ngrok-free.app
 
 **Важно:**
-
 - Замените YOUR_TELEGRAM_BOT_TOKEN на токен вашего Telegram-бота, полученный от BotFather.
 - BASE_URL будет URL, предоставленный ngrok.
 
-### 3. Выполнение миграций базы данных
+**Настройка Email (для сброса пароля)**
+* EMAIL_BACKEND=django.core.mail.backends.console.EmailBackend # Для разработки: выводит письма в консоль
+* EMAIL_BACKEND=django.core.mail.backends.smtp.EmailBackend # Для продакшен
+* EMAIL_HOST=smtp.example.com
+* EMAIL_PORT=587
+* EMAIL_USE_TLS=True
+* EMAIL_HOST_USER=your_email@example.com
+* EMAIL_HOST_PASSWORD=your_email_password
 
-После запуска базы данных выполните миграции:
+### 5. Настройка базы данных
+
+Проект использует PostgreSQL. Убедитесь, что у вас установлен и запущен PostgreSQL,
+и создайте базу данных, указанную в .env.
+
+### 6. Выполнение миграций
+
+После любых изменений в моделях Django необходимо создать файлы миграций,
+а затем применить их для обновления структуры базы данных.
+
+**Создание файлов миграций:**
 
 ```
-python manage.py makemigrations 
+    python manage.py makemigrations
 ```
 
-```
-poetry run python manage.py migrate
-```
-
-### 4. Загрузка начальных данных (фикстуры)
-
-Проект включает начальные данные (пользователи, привычки, категории), которые можно загрузить с помощью кастомной
-команды:
+Примените миграции для создания таблиц в базе данных:
 
 ```
-poetry run python manage.py loadinitialdata
+    python manage.py migrate
 ```
 
+### 7. Загрузка начальных данных (фикстуры)
+
+Проект включает начальные данные (пользователи, привычки, категории),
+которые можно загрузить с помощью кастомной команды:
+```
+python -Xutf8 manage.py loadinitialdata
+```
 Эта команда сначала предложит удалить существующие данные. Введите да для подтверждения.
-
-### 5. Запуск Celery Worker и Celery Beat
-
-Celery необходим для выполнения асинхронных задач (например, отправки напоминаний). Запустите их в отдельных терминалах:
-
-Терминал 1: Celery Worker
-
+Чтобы создать фикстуру с уже имеющимися у Вас данными, используйте это:
 ```
-poetry run celery -A config worker -l info -E -P solo
+python manage.py dumpdata users.user users.userprofile habits.habitcategory habits.habit --indent 4 > habits/fixtures/initial_data.json
 ```
 
-Терминал 2: Celery Beat (планировщик)
+### 8. Создание суперпользователя (для доступа к админ-панели)
+```
+    python manage.py createsuperuser
+```
 
+Следуйте инструкциям в консоли для создания учетной записи суперпользователя.
+
+### 9. Установка и запуск Redis
+
+Redis требуется для работы кеширования (настроен в `settings.py` через `CACHES`).
+
+## Установка
+
+**Windows**:
+
+1. Скачайте Redis с [официального репозитория](https://github.com/microsoftarchive/redis/releases)
+2. Установите через установщик или запустите `redis-server.exe` напрямую
+
+**Linux**:
 ```
-poetry run celery -A config beat -l info -s celerybeat-schedule
+    sudo apt update
+    sudo apt install redis
 ```
 
-### 6. Запуск сервера Django
+## Запуск
 
+**Windows:**
 ```
-poetry run python manage.py runserver
+    redis-server.exe
 ```
+
+**Linux:**
+```
+    sudo service redis start
+    # Или
+    redis-server
+```
+
+## Проверка
+```
+    redis-cli ping
+    # Ожидаемый ответ: PONG
+```
+
+Убедитесь, что сервер Redis запущен перед запуском приложения.
 
 Сервер будет доступен по адресу http://127.0.0.1:8000/.
 
-### 7. Настройка Telegram Webhook с Ngrok
+### 10. Запуск Celery Worker и Celery Beat
 
+Celery необходим для выполнения асинхронных задач (например, отправки напоминаний).
+Запустите их в отдельных терминалах:
+
+**Терминал 1: Celery Worker**
+
+Откройте новый терминал и запустите Celery Worker. На Windows обязательно используйте флаг -P solo для однопоточного
+режима, чтобы избежать проблем с многопроцессорностью.
+```
+        # На Windows
+    celery -A config worker -l info -E -P solo
+```
+
+```
+    # На Linux/macOS
+    celery -A config worker -l info -E
+```
+
+**Терминал 2: Celery Beat (планировщик)**
+
+Откройте еще один новый терминал и запустите Celery Beat. Он будет планировать периодические задачи.
+
+```
+    celery -A skillshare_platform beat -l info
+```
+
+### 11.  Запуск сервера Django
+```
+    python manage.py runserver
+```
+Сервер будет доступен по адресу http://127.0.0.1:8000/.
+
+### 12. Как создать Telegram-бота и получить Chat ID
+
+Чтобы ваш проект мог взаимодействовать с Telegram, вам потребуется создать бота и получить его токен,
+а также узнать свой персональный Chat ID для тестирования.
+
+#### 1. Создание нового бота через BotFather
+
+1.  Откройте Telegram и найдите бота `@BotFather`. Это официальный бот для управления другими ботами.
+2.  Начните диалог с ним, отправив команду `/start`.
+3.  Отправьте команду `/newbot`.
+4.  BotFather попросит вас выбрать имя для вашего бота. Это отображаемое имя (например, `GoodHabitLab Bot`). Введите его.
+5.  Затем BotFather попросит выбрать уникальный username для вашего бота. Он должен заканчиваться 
+6. на `bot` (например, `GoodHabitLab_test_bot` или `my_awesome_project_bot`). Введите его.
+6.  Если username свободен, BotFather пришлет вам сообщение с токеном вашего нового бота.
+7. **Обязательно сохраните этот токен!** Он выглядит примерно так: `123456789:ABCDefgh1234567890abcdef1234567890`.
+
+    Этот токен нужно будет добавить в ваш файл [.env](.env) как значение для `TELEGRAM_BOT_TOKEN`.
+
+#### 2. Получение вашего Telegram Chat ID
+
+Ваш Telegram Chat ID — это уникальный идентификатор вашего личного чата с ботом. 
+Он необходим, чтобы бот мог отправлять вам сообщения.
+
+1.  Найдите вашего только что созданного бота в Telegram по username (тот, что заканчивается на `bot`).
+2.  Начните диалог с ним, отправив любое сообщение, например, `/start`.
+3.  Теперь вам нужно узнать `chat_id` этого диалога. Для этого откройте в браузере следующую ссылку, 
+4. заменив `<YOUR_BOT_TOKEN>` на токен вашего бота:
+    `https://api.telegram.org/bot<YOUR_BOT_TOKEN>/getUpdates`
+4.  Вы увидите JSON-ответ. Найдите в нем секцию `result` -> `message` -> `chat` -> `id`. 
+5. Значение поля `id` будет вашим `telegram_chat_id`. Например:
+    ```{
+  "ok": true,
+  "result": [
+    {
+      "update_id": 123456789,
+      "message": {
+        "message_id": 123,
+        "from": {
+          // ...
+        },
+        "chat": {
+          "id": 1234567890,
+          "first_name": "ВашеИмя"
+        }
+      }
+    }
+  ]
+}
+    ```
+    Если вы видите пустой `result` массив `[]`, 
+  убедитесь, что вы отправили сообщение боту после его создания, и обновите страницу.
+5.  Скопируйте полученный `id` и добавьте его в ваш файл [.env](.env) как значение для `TELEGRAM_CHAT_ID`.
+
+Теперь у вас есть все необходимые данные для настройки Telegram-бота в вашем проекте!
+
+### 13. Настройка Telegram Webhook с Ngrok
 Telegram-бот взаимодействует с вашим приложением через вебхуки. Поскольку ваш сервер работает локально,
-вам нужно использовать ngrok для создания публичного туннеля:
+вам нужно использовать ngrok для создания публичного туннеля.
 
-Терминал 3: Ngrok
+**1. Зарегистрируйтесь и установите ngrok**:
+- Перейдите на ngrok.com и зарегистрируйтесь.
+- Скачайте ngrok для вашей операционной системы.
+- Распакуйте архив и добавьте исполняемый файл ngrok в PATH вашей системы, чтобы он был доступен из любого каталога.
 
-```
-ngrok http http://localhost:8080 
-```
-
-ngrok предоставит публичный URL (например, https://abcdef123456.ngrok-free.app). Скопируйте этот URL.
-
-**Установите вебхук Telegram:**
-
-Отправьте HTTP POST-запрос на Telegram Bot API для установки вебхука. Замените <YOUR_TELEGRAM_BOT_TOKEN> на ваш токен,
-а <YOUR_NGROK_URL> на URL, который предоставил ngrok:
+**2. Аутентифицируйте ngrok:**
+- После регистрации на сайте ngrok.com вы найдете свой аутентификационный токен в личном кабинете.
+- Выполните следующую команду в терминале, заменив <YOUR_NGROK_AUTHTOKEN> на ваш реальный токен:
 
 ```
-curl -F "url=<YOUR_NGROK_URL>/telegram/webhook/" https://api.telegram.org/bot<YOUR_TELEGRAM_BOT_TOKEN>/setWebhook
+    ngrok authtoken <YOUR_NGROK_AUTHTOKEN>
 ```
 
-Убедитесь, что BASE_URL в вашем .env файле также обновлен до YOUR_NGROK_URL.
+**3. Запустите ngrok:**
+- В новом терминале запустите ngrok, чтобы создать туннель для вашего локального сервера Django
+- (который работает на порту 8000):
+```
+ngrok http 8000
+```
+- ngrok предоставит публичный URL (например, https://abcdef123456.ngrok-free.app). Скопируйте этот URL.
+- 
+**4. Установите вебхук Telegram:**
+
+- Обновите значение BASE_URL в вашем файле 📄.env на скопированный URL от ngrok.
+- Отправьте HTTP POST-запрос на Telegram Bot API для установки вебхука. Замените <YOUR_TELEGRAM_BOT_TOKEN> на ваш токен,
+- а <YOUR_NGROK_URL> на URL, который предоставил ngrok (включая /telegram/webhook/):
+
+```
+    curl -F "url=<YOUR_NGROK_URL>/telegram/webhook/" https://api.telegram.org/bot<YOUR_TELEGRAM_BOT_TOKEN>/setWebhook
+```
 
 Теперь ваш Telegram-бот должен получать обновления и взаимодействовать с вашим приложением.
-Попробуйте отправить команду /start вашему боту в Telegram.
+~~### Пока в стадии реализации
+Попробуйте отправить команду /start вашему боту в Telegram.~~
 
 ## Использование API и бота
 
@@ -179,10 +366,10 @@ curl -F "url=<YOUR_NGROK_URL>/telegram/webhook/" https://api.telegram.org/bot<YO
 Чтобы начать использовать бота:
 
 1. Найдите вашего бота в Telegram по имени пользователя (например, @YourHabitBot).
-2. Отправьте команду /start.
+2. ~~Отправьте команду /start. **(пока в стадии реализации)**~~
 3. Бот предложит привязать ваш Telegram Chat ID к аккаунту на сайте. Используйте Chat ID, который бот пришлет, и
    обновите профиль пользователя на сайте или через API.
-4. После привязки вы будете получать напоминания о привычках и сможете взаимодействовать с ними через кнопки.
+4. После привязки вы будете получать напоминания о привычках ~~и сможете взаимодействовать с ними через кнопки~~.
 
 ## Заключение
 
