@@ -4,7 +4,7 @@ from celery import shared_task
 from django.utils import timezone
 
 from habits.models import Habit, HabitLog
-from telegram_bot.services import send_telegram_message, send_telegram_message_with_keyboard
+from telegram_bot.services import send_telegram_message
 from users.models import User
 from datetime import date, datetime, timedelta
 
@@ -16,13 +16,7 @@ def send_habit_reminder(chat_id: str, message: str, habit_log_id: int) -> None:
     """
     Асинхронно отправляет напоминание одному пользователю в Telegram.
     """
-    keyboard = [
-        [
-            {"text": "Выполнить", "callback_data": f"done_{habit_log_id}"},
-            {"text": "Отложить на 2 часа", "callback_data": f"postpone_2h_{habit_log_id}"}
-        ]
-    ]
-    send_telegram_message_with_keyboard(chat_id, message, keyboard)
+    send_telegram_message(chat_id, message)
 
 
 @shared_task
@@ -121,10 +115,4 @@ def send_postponed_habit_reminder(chat_id: str, habit_log_id: int):
         return
 
     text = f"Повторное напоминание: {habit.title} — {habit.description}"
-    keyboard = [
-        [
-            {"text": "Выполнить", "callback_data": f"done_{habit_log.id}"},
-            {"text": "Отложить на 2 часа", "callback_data": f"postpone_2h_{habit_log.id}"}
-        ]
-    ]
-    send_telegram_message_with_keyboard(chat_id, text, keyboard)
+    send_telegram_message(chat_id, text)
