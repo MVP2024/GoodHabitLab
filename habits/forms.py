@@ -1,4 +1,5 @@
 from django import forms
+
 from .models import Habit
 
 
@@ -49,7 +50,13 @@ class HabitAdminForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        if self.instance and self.instance.selected_weekdays:
+        # Если это редактирование существующего объекта и периодичность 'daily',
+        # или если периодичность 'custom' и есть выбранные дни,
+        # устанавливаем initial для selected_weekdays.
+        if self.instance and self.instance.periodicity == 'daily':
+            # Если periodic_type 'daily', то selected_weekdays должны быть все дни
+            self.initial['selected_weekdays'] = [day[0] for day in self.fields['selected_weekdays'].choices]
+        elif self.instance and self.instance.selected_weekdays:
             self.initial['selected_weekdays'] = self.instance.selected_weekdays
 
     def clean(self):
@@ -57,16 +64,19 @@ class HabitAdminForm(forms.ModelForm):
         periodicity = cleaned_data.get('periodicity')
         selected_weekdays = cleaned_data.get('selected_weekdays')
 
-        if periodicity == 'custom' and not selected_weekdays:
-            self.add_error('selected_weekdays', "Для 'Выборочных дней' необходимо выбрать хотя бы один день недели.")
-        elif periodicity != 'custom':
-            # Если выбрана не 'custom' периодичность, очищаем selected_weekdays
-            # Это должно быть так, потому что для других периодичностей дни недели неактуальны.
+        # Если периодичность 'daily', автоматически заполняем selected_weekdays всеми днями недели.
+        # Это также обработает случай, когда пользователь выбрал 'daily', но не выбрал дни.
+        if periodicity == 'daily':
+            all_weekdays = [day[0] for day in self.fields['selected_weekdays'].choices]
+            cleaned_data['selected_weekdays'] = all_weekdays
+        elif periodicity == 'custom':
+            if not selected_weekdays:
+                self.add_error('selected_weekdays',
+                               "Для 'Выборочных дней' необходимо выбрать хотя бы один день недели.")
+            # Убираем дубликаты дней недели, если есть
+            cleaned_data['selected_weekdays'] = list(set(selected_weekdays))
+        else:
+            # Если выбрана не 'custom' и не 'daily' периодичность, очищаем selected_weekdays
             cleaned_data['selected_weekdays'] = []
-
-        # Автоматическое переключение на "Ежедневно", если выбраны все 7 дней в custom
-        if periodicity == 'custom' and selected_weekdays and len(selected_weekdays) == 7:
-            cleaned_data['periodicity'] = 'daily'
-            cleaned_data['selected_weekdays'] = [] # Очищаем, так как теперь daily
 
         return cleaned_data

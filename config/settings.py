@@ -2,8 +2,8 @@ import os
 from datetime import timedelta
 from pathlib import Path
 
-from celery.schedules import crontab  # Используем crontab для более гибкого расписания
-
+from celery.schedules import \
+    crontab  # Используем crontab для более гибкого расписания
 from dotenv import load_dotenv
 
 load_dotenv()  # Загружаем переменные окружения из .env
@@ -19,7 +19,7 @@ if not DEBUG:
     ALLOWED_HOSTS = [host.strip() for host in ALLOWED_HOSTS_ENV.split(",") if host.strip()]
     if not ALLOWED_HOSTS:
         raise ValueError("Для DEBUG=False необходимо задать ALLOWED_HOSTS в .env")
-    ALLOWED_HOSTS.extend([".ngrok-free.app", "127.0.0.1", "localhost"]) # Добавил эту строчку
+    ALLOWED_HOSTS.extend([".ngrok-free.app", "127.0.0.1", "localhost"])  # Добавил эту строчку
 else:
     ALLOWED_HOSTS = ["*"]
 
@@ -180,6 +180,10 @@ CELERY_ACCEPT_CONTENT = ["application/json"]
 CELERY_TASK_SERIALIZER = "json"
 CELERY_RESULT_SERIALIZER = "json"
 CELERY_TIMEZONE = TIME_ZONE  # Должен совпадать с TIME_ZONE Django
+CELERY_IMPORTS = (
+    'habits.tasks',
+    'telegram_bot.tasks',
+)
 
 # Настройка JWT
 SIMPLE_JWT = {

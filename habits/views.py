@@ -1,18 +1,20 @@
-from rest_framework import viewsets, permissions
-from rest_framework.permissions import IsAuthenticated
-from rest_framework_simplejwt.authentication import JWTAuthentication
-from rest_framework.response import Response
-from rest_framework.decorators import action
-from django.db.models import Q
-from drf_spectacular.utils import (
-    extend_schema, OpenApiParameter, OpenApiResponse
-)
 import logging
-from telegram_bot.tasks import send_habit_reminder, send_congratulation
-from .models import Habit, HabitCategory, HabitLog, Reward, Notification
-from .serializers import (
-    HabitSerializer, HabitCategorySerializer, HabitLogSerializer, RewardSerializer, NotificationSerializer
-)
+
+from django.db.models import Q
+from drf_spectacular.utils import (OpenApiParameter, OpenApiResponse,
+                                   extend_schema)
+from rest_framework import permissions, status, viewsets
+from rest_framework.decorators import action
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.response import Response
+from rest_framework_simplejwt.authentication import JWTAuthentication
+
+from telegram_bot.tasks import send_congratulation_message, send_habit_reminder
+
+from .models import Habit, HabitCategory, HabitLog, Notification, Reward
+from .serializers import (HabitCategorySerializer, HabitLogSerializer,
+                          HabitSerializer, NotificationSerializer,
+                          RewardSerializer)
 
 
 @extend_schema(
@@ -26,32 +28,105 @@ class HabitViewSet(viewsets.ModelViewSet):
     serializer_class = HabitSerializer
     permission_classes = [IsAuthenticated]
     authentication_classes = [JWTAuthentication]
+    queryset = Habit.objects.all()
 
     def get_queryset(self):
+        # Пользователь видит свои привычки и публичные привычки других пользователей
         return Habit.objects.filter(
-            Q(user=self.request.user) | Q(is_public=True),
-            is_active=True
+            Q(user=self.request.user) | Q(is_public=True)
         ).order_by('id')
 
+    def retrieve(self, request, *args, **kwargs):
+        """
+        Получить детальную информацию о привычке. Пользователь может просматривать:
+        - Свои привычки.
+        - Публичные привычки других пользователей.
+        """
+        instance = self.get_object()
+        # Проверяем, является ли привычка публичной и не принадлежит ли она текущему пользователю
+        if not instance.is_public and instance.user != request.user:
+            return Response(
+                {"detail": "У вас нет разрешения на просмотр этой привычки."},
+                status=status.HTTP_404_NOT_FOUND  # 404 для сокрытия существования привычки
+            )
+        serializer = self.get_serializer(instance)
+        return Response(serializer.data)
+
+    @action(detail=False, methods=['get'], url_path='public')
     @extend_schema(
-        summary="Получить список привычек",
-        description="Возвращает список всех привычек текущего пользователя, "
-                    "а также публичных привычек других пользователей.",
+        summary="Получить публичные привычки",
+        description="""Возвращает список всех привычек, помеченных как публичные (`is_public=True`).
+            Эти привычки доступны для просмотра всем аутентифицированным пользователям.
+            """,
         tags=["Привычки"],
         responses=HabitSerializer(many=True),
     )
-    def list(self, request, *args, **kwargs):
-        return super().list(request, *args, **kwargs)
+    def public_habits(self, request):
+        queryset = Habit.objects.filter(is_public=True).order_by('id')
+        page = self.paginate_queryset(queryset)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
+        serializer = self.get_serializer(queryset, many=True)
+        return Response(serializer.data)
 
+    @action(detail=True, methods=['post'])
     @extend_schema(
-        summary="Получить информацию о привычке",
-        description="Получить подробную информацию о привычке по её ID (если она доступна пользователю).",
+        summary="Скопировать публичную привычку",
+        description="""Создает личную копию выбранной публичной привычки для текущего пользователя.
+                        Копированная привычка становится личной (поле `is_public` устанавливается в `False`)
+                        и привязывается к текущему пользователю.
+                        """,
+        parameters=[
+            OpenApiParameter(
+                name="pk",
+                type=int,
+                location=OpenApiParameter.PATH,
+                description="ID публичной привычки, которую нужно скопировать.",
+                required=True
+            )
+        ],
         tags=["Привычки"],
-        parameters=[OpenApiParameter("id", int, OpenApiParameter.PATH, description="ID привычки")],
-        responses=HabitSerializer,
+        responses={
+            201: OpenApiResponse(response=HabitSerializer, description="Привычка успешно скопирована."),
+            400: OpenApiResponse(description="Указанная привычка не найдена или не является публичной."),
+            401: OpenApiResponse(description="Требуется аутентификация."),
+        },
     )
-    def retrieve(self, request, *args, **kwargs):
-        return super().retrieve(request, *args, **kwargs)
+    def copy(self, request, pk=None):
+        try:
+            original_habit = Habit.objects.get(pk=pk, is_public=True)
+        except Habit.DoesNotExist:
+            return Response(
+                {"Детально": "Привычка не найдена или не является публичной."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Создаем новую привычку на основе существующей
+        new_habit_data = {
+            'title': original_habit.title,
+            'description': original_habit.description,
+            'category': original_habit.category.id if original_habit.category else None,
+            'is_public': False,  # Копированная привычка всегда личная
+            'periodicity': original_habit.periodicity,
+            'selected_weekdays': original_habit.selected_weekdays,
+            'place': original_habit.place,
+            'color': original_habit.color,
+            'icon': original_habit.icon,
+            'is_active': True,
+            'planned_time': original_habit.planned_time,
+            'is_pleasant': original_habit.is_pleasant,
+            'duration': original_habit.duration,
+            'reward': original_habit.reward,
+            'related_habit': original_habit.related_habit.id if original_habit.related_habit else None,
+
+        }
+
+        serializer = self.get_serializer(data=new_habit_data)
+        serializer.is_valid(raise_exception=True)
+        serializer.save(user=self.request.user)  # Привязываем к текущему пользователю
+
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
 
     @extend_schema(
         summary="Создать новую привычку",
@@ -89,7 +164,6 @@ class HabitViewSet(viewsets.ModelViewSet):
         summary="Удалить привычку",
         description="Удаляет выбранную привычку пользователя по её ID (если у вас есть доступ).",
         tags=["Привычки"],
-        parameters=[OpenApiParameter("id", int, OpenApiParameter.PATH, description="ID привычки")],
         responses={204: OpenApiResponse(description="Успешное удаление привычки")},
     )
     def destroy(self, request, *args, **kwargs):
@@ -98,50 +172,8 @@ class HabitViewSet(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         serializer.save(user=self.request.user)
 
-    @action(detail=True, methods=['post'], url_path='copy')
-    @extend_schema(
-        summary="Скопировать публичную привычку",
-        description="Создает личную копию выбранной публичной привычки для текущего пользователя.",
-        tags=["Привычки"],
-        responses={
-            201: HabitSerializer,
-            400: OpenApiResponse(description="Привычка не найдена или не является публичной."),
-        },
-    )
-    def copy(self, request, pk=None):
-        try:
-            original_habit = self.get_queryset().get(pk=pk, is_public=True)
-        except Habit.DoesNotExist:
-            return Response(
-                {"detail": "Привычка не найдена или не является публичной."},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-
-        # Создаем новую привычку на основе существующей
-        new_habit_data = {
-            'title': original_habit.title,
-            'description': original_habit.description,
-            'category': original_habit.category.id if original_habit.category else None,
-            'is_public': False,  # Копированная привычка всегда личная
-            'periodicity': original_habit.periodicity,
-            'selected_weekdays': original_habit.selected_weekdays,
-            'place': original_habit.place,
-            'color': original_habit.color,
-            'icon': original_habit.icon,
-            'is_active': True,
-            'planned_time': original_habit.planned_time,
-            'is_pleasant': original_habit.is_pleasant,
-            'duration': original_habit.duration,
-            'reward': original_habit.reward,
-            'related_habit': original_habit.related_habit.id if original_habit.related_habit else None,
-
-        }
-
-        serializer = self.get_serializer(data=new_habit_data)
-        serializer.is_valid(raise_exception=True)
-        serializer.save(user=self.request.user)  # Привязываем к текущему пользователю
-
-        return Response(serializer.data, status=status.HTTP_201_CREATED)
+    def perform_update(self, serializer):
+        serializer.save(user=self.request.user)
 
 
 @extend_schema(
@@ -214,7 +246,6 @@ class HabitCategoryViewSet(viewsets.ModelViewSet):
         summary="Удалить категорию привычек",
         description="Удаляет выбранную категорию по её ID.",
         tags=["Категории привычек"],
-        parameters=[OpenApiParameter("id", int, OpenApiParameter.PATH, description="ID категории")],
         responses={204: OpenApiResponse(description="Успешное удаление категории")},
     )
     def destroy(self, request, *args, **kwargs):
@@ -294,7 +325,6 @@ class HabitLogViewSet(viewsets.ModelViewSet):
         summary="Удалить лог привычки",
         description="Удалить выбранный лог привычки по его ID.",
         tags=["Логи привычек"],
-        parameters=[OpenApiParameter("id", int, OpenApiParameter.PATH, description="ID лога")],
         responses={204: OpenApiResponse(description="Успешное удаление лог-записи")},
     )
     def destroy(self, request, *args, **kwargs):
@@ -313,7 +343,7 @@ class HabitLogViewSet(viewsets.ModelViewSet):
                 return
 
             if habit_log.is_done:
-                send_congratulation.delay(
+                send_congratulation_message.delay(
                     str(chat_id),
                     f"Поздравляем! Вы выполнили привычку: {habit_log.habit.title}!"
                 )
@@ -396,7 +426,6 @@ class RewardViewSet(viewsets.ModelViewSet):
         summary="Удалить награду",
         description="Удаляет выбранную награду по её ID.",
         tags=["Награды"],
-        parameters=[OpenApiParameter("id", int, OpenApiParameter.PATH, description="ID награды")],
         responses={204: OpenApiResponse(description="Успешное удаление награды")},
     )
     def destroy(self, request, *args, **kwargs):
@@ -446,9 +475,9 @@ class NotificationViewSet(viewsets.ReadOnlyModelViewSet):
     def perform_create(self, serializer):
         user = self.request.user
         habit = serializer.validated_data.get('habit')
-        notification_type = serializer.validated_data.get('notification_type', 'info')  # По умолчанию 'info'
 
         message = serializer.validated_data.get('message')
+        notification_type = serializer.validated_data.get('notification_type')
 
         # Если сообщение не предоставлено, генерируем его на основе типа
         if not message:
@@ -463,7 +492,9 @@ class NotificationViewSet(viewsets.ReadOnlyModelViewSet):
             elif notification_type == 'inactive_reminder':
                 message = "Мы заметили, что вы давно не выполняли привычки. Пора вернуться к ним!"
             else:
-                message = ("Внутренняя ошибка: Не удалось сформировать сообщение уведомления. "
-                           "Пожалуйста, обратитесь в поддержку.")
+                # Если notification_type отсутствует и сообщение не предоставлено,
+                #  оставляем message None или пустой строкой,
+                # в соответствии с blank=True, null=True в модели.
+                message = None  # пустая строка, в зависимости от желаемого поведения
 
         serializer.save(user=user, message=message, notification_type=notification_type)

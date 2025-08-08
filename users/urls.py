@@ -1,7 +1,10 @@
 from django.urls import path, re_path
 from rest_framework.routers import DefaultRouter
-from .password_reset_views import CustomPasswordResetConfirmView, CustomPasswordResetView
-from .views import CustomTokenObtainPairView, CustomTokenRefreshView, UserProfileViewSet, UserRegistrationAPIView
+
+from .password_reset_views import (CustomPasswordResetConfirmView,
+                                   CustomPasswordResetView)
+from .views import (CustomTokenObtainPairView, CustomTokenRefreshView,
+                    UserProfileViewSet, UserRegistrationAPIView)
 
 router = DefaultRouter()
 router.register(r"profile", UserProfileViewSet, basename="user-profile")

@@ -1,4 +1,5 @@
 from django.db import models
+
 from users.models import User
 
 
@@ -18,4 +19,4 @@ class TelegramBotLog(models.Model):
     error = models.TextField(blank=True)
 
     def __str__(self):
-        return f"Log for chat {self.telegram_chat_id}: {self.message[:30]}"
+        return f"Лог для чата {self.telegram_chat_id}: {self.message[:30]}"

@@ -2,11 +2,10 @@ import logging
 
 from django.contrib.auth.models import AnonymousUser
 from drf_spectacular.utils import extend_schema, extend_schema_view
-from rest_framework import generics, mixins, serializers, status, viewsets
+from rest_framework import generics, mixins, status, viewsets
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework_simplejwt.authentication import JWTAuthentication
-from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 from rest_framework_simplejwt.views import (TokenObtainPairView,
                                             TokenRefreshView)
 

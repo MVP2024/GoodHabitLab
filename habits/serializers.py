@@ -1,6 +1,8 @@
+from django.core.exceptions import ValidationError
 from rest_framework import serializers
+from users.models import User
 
-from .models import Habit, HabitCategory, HabitLog, Reward, Notification
+from .models import Habit, HabitCategory, HabitLog, Notification, Reward
 
 HABIT_TITLE_SOURCE = "habit.title"
 
@@ -15,7 +17,7 @@ class HabitCategorySerializer(serializers.ModelSerializer):
         fields = "__all__"
         extra_kwargs = {
             'name': {'error_messages': {
-                'unique': 'Категория привычки с таким названием уже существует. Пожалуйста, выберите другое название.'}}
+                'unique': 'Название категории с таким названием уже существует.'}}
         }
 
 
@@ -68,13 +70,19 @@ class NotificationSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = ["id", "user_email", "habit_title", "sent_at"]
         extra_kwargs = {
-            'message': {'required': False},  # Поле message теперь опционально при создании
-            'notification_type': {'required': False},  # Поле notification_type тоже опционально
-            'notification_title': {'required': False} # Поле notification_title тоже опционально
+            'message': {'required': False},
+            'notification_type': {'required': False},
+            'notification_title': {'required': False}
         }
 
 
 class HabitSerializer(serializers.ModelSerializer):
+    user = serializers.PrimaryKeyRelatedField(read_only=True, default=serializers.CurrentUserDefault())
+    category = serializers.PrimaryKeyRelatedField(queryset=HabitCategory.objects.all(), allow_null=True, required=False)
+    related_habit = serializers.PrimaryKeyRelatedField(
+        queryset=Habit.objects.all(), allow_null=True, required=False
+    )
+
     """
     Сериализатор для модели привычки.
     Обеспечивает валидацию данных перед созданием или обновлением привычки.
@@ -93,24 +101,39 @@ class HabitSerializer(serializers.ModelSerializer):
         :param data:
         :return:
         """
-        periodicity = data.get('periodicity')
-        selected_weekdays = data.get('selected_weekdays')
+        # Создаем временный экземпляр привычки с данными для валидации
+        # или обновляем существующий, чтобы вызвать clean() модели.
+        # Это важно для доступа к связанным объектам, таким как related_habit.
+        if self.instance:
+            # Обновляем существующий экземпляр для валидации
+            temp_habit = self.instance
+            for attr, value in data.items():
+                setattr(temp_habit, attr, value)
+        else:
+            # Создаем новый экземпляр для валидации
+            temp_habit = Habit(**data)
+            # Временно устанавливаем пользователя, чтобы пройти валидацию модели
+            # Добавлено условие, чтобы избежать ошибки, если request.user анонимный или отсутствует
+            # (например, в тестах без аутентификации)
+            if 'request' in self.context and self.context['request'].user.is_authenticated:
+                temp_habit.user = self.context['request'].user
+            elif 'user' in data and data['user'] is not None:  # Если user передан явно в данных
+                # (например, для админа или тестов)
+                try:
+                    # Получаем объект User по ID
+                    temp_habit.user = User.objects.get(id=data['user'])
+                except User.DoesNotExist:
+                    raise serializers.ValidationError({"user": "Указанный пользователь не существует."})
+            else:
+                # Если user не установлен, и это новый объект, raise ValidationError
+                raise serializers.ValidationError({"user": "Пользователь не установлен для валидации привычки."})
 
-        if periodicity == 'custom' and not selected_weekdays:
-            raise serializers.ValidationError(
-                {"selected_weekdays": "Для 'Выборочных дней' необходимо указать дни недели."}
-            )
-        # Если periodicity не 'custom', но selected_weekdays переданы, очищаем их
-        if periodicity != 'custom' and selected_weekdays:
-            data['selected_weekdays'] = []  # Устанавливаем пустой список
+        # Валидируем данные через метод clean() модели
+        try:
+            temp_habit.full_clean()  # full_clean вызывает clean, validate_constrains и validate_unique
+        except ValidationError as e:
+            # Перехватываем ошибки валидации модели и преобразуем их в ошибки сериализатора
+            # e.message_dict содержит ошибки в виде {поле: [сообщение]}
+            raise serializers.ValidationError(e.message_dict)
 
-        # Валидация корректности дней недели (опционально, можно расширить)
-        if periodicity == 'custom' and selected_weekdays:
-            valid_days = ['пн', 'вт', 'ср', 'чт', 'пт', 'сб', 'вс']
-            for day in selected_weekdays:
-                if day.lower() not in valid_days:
-                    raise serializers.ValidationError(
-                        {
-                            "selected_weekdays": f"Некорректный день недели: '{day}'. Используйте ['пн', 'вт', 'ср', ...]."}
-                    )
         return data

@@ -1,11 +1,9 @@
-import os
 import logging
-from typing import Any, Dict, Optional, List
-from django.conf import settings
-import requests
-from dotenv import load_dotenv
-import json
+from typing import Any, Dict, Optional
 
+import requests
+from django.conf import settings
+from dotenv import load_dotenv
 
 load_dotenv()
 

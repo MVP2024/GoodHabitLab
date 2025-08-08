@@ -1,7 +1,8 @@
-from django.db import models
 from django.contrib.postgres.fields import ArrayField
-from users.models import User
 from django.core.exceptions import ValidationError
+from django.db import models
+
+from users.models import User
 
 
 class HabitCategory(models.Model):
@@ -38,15 +39,14 @@ class Habit(models.Model):
     periodicity = models.CharField(
         max_length=50,
         default='daily',
-        choices=[('daily', 'Ежедневно'),
-                 ('weekly', 'Еженедельно'),
-                 ('monthly', 'Ежемесячно'),
-                 ('custom', 'Выборочные дни')
-                 ],
+        choices=[
+            ('daily', 'Ежедневно'),
+            ('custom', 'Выборочные дни')
+        ],
         verbose_name="Периодичность"
     )
     # Используем ArrayField для хранения списка дней недели
-    selected_weekdays = ArrayField(
+    selected_weekdays: list[str] = ArrayField(
         models.CharField(max_length=10),
         blank=True,
         default=list,
@@ -72,61 +72,136 @@ class Habit(models.Model):
     )
     related_habit = models.ForeignKey(
         'self', on_delete=models.SET_NULL, null=True, blank=True,
-        related_name='useful_habits', verbose_name="Связанная привычка",
+        related_name='useful_habits', verbose_name="Привычка",
         help_text="Привычка, которая связана с другой привычкой (должна быть приятной привычкой)"
     )
 
     def __str__(self) -> str:
         return f"{self.user} - {self.title}"
 
+    def _validate_reward_and_related_habit(self) -> None:
+        """Валидация 1: Исключить одновременный выбор связанной привычки и вознаграждения."""
+        if self.related_habit and self.reward:
+            raise ValidationError(
+                "Нельзя одновременно выбирать связанную привычку и указывать вознаграждение.",
+                code='non_field_errors'
+            )
+
+    def _validate_duration(self) -> None:
+        """Валидация 2: Время выполнения должно быть не больше 120 секунд."""
+        if self.duration and self.duration > 120:
+            raise ValidationError(
+                {"duration": "Время выполнения привычки не должно превышать 120 секунд."}
+            )
+
+    def _validate_related_habit_is_pleasant(self) -> None:
+        """Валидация 3: В связанные привычки могут попадать только приятные привычки."""
+        if self.related_habit and not self.related_habit.is_pleasant:
+            raise ValidationError(
+                "В связанные привычки могут быть добавлены только приятные привычки.",
+                code='non_field_errors'
+            )
+
+    def _validate_pleasant_habit_constraints(self) -> None:
+        """Валидация 4: У приятной привычки не может быть вознаграждения или связанной привычки."""
+        if self.is_pleasant:
+            if self.reward:
+                raise ValidationError(
+                    "У приятной привычки не может быть вознаграждения.",
+                    code='non_field_errors'
+                )
+            if self.related_habit:
+                raise ValidationError(
+                    "У приятной привычки не может быть связанной привычки.",
+                    code='non_field_errors'
+                )
+
+    def _validate_custom_periodicity(self) -> None:
+        """
+        Валидация 5: Для выборочной периодичности должен быть выбран хотя бы один день и проверка на реже
+        чем 1 раза в 7 дней.
+        Включает также логику трансформации данных.
+        """
+        all_weekdays_keys = ['пн', 'вт', 'ср', 'чт', 'пт', 'сб', 'вс']
+
+        if self.periodicity == 'daily':
+            # Если 'daily', принудительно устанавливаем все дни недели
+            self.selected_weekdays = all_weekdays_keys
+        elif self.periodicity == 'custom':
+            if not self.selected_weekdays:
+                raise ValidationError(
+                    {"selected_weekdays": "Для 'Выборочных дней' необходимо выбрать хотя бы один день недели."}
+                )
+
+            # Проверка на то, что custom с всеми днями должен быть daily, и изменение
+            if set(self.selected_weekdays) == set(all_weekdays_keys):
+                self.periodicity = 'daily'
+                self.selected_weekdays = all_weekdays_keys  # Убеждаемся, что дни останутся полными
+            else:
+                # Убираем дубликаты дней недели и проверяем на наличие некорректных дней
+                unique_weekdays = sorted(set(self.selected_weekdays),
+                                         key=lambda x: all_weekdays_keys.index(x) if x in all_weekdays_keys else -1)
+
+                if any(day not in all_weekdays_keys for day in unique_weekdays):
+                    raise ValidationError(
+                        {
+                            "selected_weekdays": f"Некорректные дни недели: {unique_weekdays}."
+                                                 f" Допустимые значения: {all_weekdays_keys}"}
+                    )
+                self.selected_weekdays = unique_weekdays
+
+                weekdays_order = ['пн', 'вт', 'ср', 'чт', 'пт', 'сб', 'вс']
+                selected_indices = []
+                for day in self.selected_weekdays:
+                    try:
+                        selected_indices.append(weekdays_order.index(day))
+                    except ValueError:
+                        # Обработка случая, если в selected_weekdays попал невалидный день
+                        # Это должно быть уже поймано выше, но на всякий случай
+                        raise ValidationError(f"Некорректное значение дня недели: '{day}'.")
+                selected_indices.sort()
+
+                if not selected_indices:  # Если после удаления дубликатов список стал пустым
+                    raise ValidationError(
+                        {"selected_weekdays": "Для 'Выборочных дней' необходимо выбрать хотя бы один день недели."}
+                    )
+
+                # Проверяем, что привычка выполняется хотя бы 1 раз в 7 дней.
+                max_gap = 0
+
+                if len(selected_indices) == 1:
+                    max_gap = 6
+                else:
+                    extended_indices = selected_indices + [selected_indices[0] + 7]
+
+                    for i in range(len(selected_indices)):
+                        gap = extended_indices[i + 1] - extended_indices[i] - 1
+                        if gap > max_gap:
+                            max_gap = gap
+
+                if max_gap >= 7:
+                    raise ValidationError(
+                        "Нельзя выполнять привычку реже, чем 1 раз в 7 дней. "
+                        "Выберите дни так, чтобы привычка выполнялась хотя бы один раз в неделю."
+                    )
+        else:
+            # Если periodicity не 'daily' и не 'custom', очищаем selected_weekdays
+            self.selected_weekdays = []
+
     def clean(self) -> None:
         """
         Метод для выполнения комплексной валидации полей модели Habit.
         Переопределяет стандартный метод `clean` Django.
         """
-        # Валидация 1: Исключить одновременный выбор связанной привычки и указания вознаграждения.
-        if self.related_habit and self.reward:
-            raise ValidationError(
-                "Нельзя одновременно выбирать связанную привычку и указывать вознаграждение."
-            )
-
-        # Валидация 2: Время выполнения должно быть не больше 120 секунд.
-        if self.duration and self.duration > 120:
-            raise ValidationError(
-                "Время выполнения привычки не должно превышать 120 секунд."
-            )
-
-        # Валидация 3: В связанные привычки могут попадать только привычки с признаком приятной привычки.
-        if self.related_habit and not self.related_habit.is_pleasant:
-            raise ValidationError(
-                "В связанные привычки могут быть добавлены только приятные привычки."
-            )
-
-        # Валидация 4: У приятной привычки не может быть вознаграждения или связанной привычки.
-        if self.is_pleasant:
-            if self.reward:
-                raise ValidationError(
-                    "У приятной привычки не может быть вознаграждения."
-                )
-            if self.related_habit:
-                raise ValidationError(
-                    "У приятной привычки не может быть связанной привычки."
-                )
-
-        # Валидация 5: Нельзя выполнять привычку реже, чем 1 раз в 7 дней.
-        # Это подразумевает, что если periodicity не 'daily', 'weekly', 'monthly',
-        # то selected_weekdays должны содержать дни, чтобы хотя бы раз в неделю выполнялась.
-        # Для 'weekly' и 'monthly' это уже заложено их смыслом (раз в неделю/месяц).
-        # Для 'custom' нужно проверить, что выбран хотя бы один день.
-        if self.periodicity == 'custom' and not self.selected_weekdays:
-            raise ValidationError(
-                "Для выборочной периодичности необходимо выбрать хотя бы один день недели."
-            )
+        self._validate_reward_and_related_habit()
+        self._validate_duration()
+        self._validate_related_habit_is_pleasant()
+        self._validate_pleasant_habit_constraints()
+        self._validate_custom_periodicity()
 
     class Meta:
         verbose_name = 'Привычка'
         verbose_name_plural = 'Привычки'
-
 
 
 class HabitLog(models.Model):
@@ -153,9 +228,6 @@ class HabitLog(models.Model):
     def __str__(self) -> str:
         return f"{self.habit} - {self.date}: {'Выполнено' if self.is_done else 'Не выполнено'}"
 
-    # def get_queryset(self):
-    #     return super().get_queryset().filter(user=self.request.user)
-
     class Meta:
         verbose_name = "Лог привычки"
         verbose_name_plural = "Логи привычек"
@@ -164,9 +236,11 @@ class HabitLog(models.Model):
 
 class DailyHabitLog(models.Model):
     habit = models.ForeignKey(Habit, on_delete=models.CASCADE, related_name='daily_logs', verbose_name='Привычка')
-    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='daily_habit_logs', verbose_name='Пользователь')
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='daily_habit_logs',
+                             verbose_name='Пользователь')
     date = models.DateField(verbose_name="Дата")
-    status = models.CharField(max_length=20, choices=[('done', 'Выполнено'), ('skipped', 'Пропущено')], default='done', verbose_name='Статус')
+    status = models.CharField(max_length=20, choices=[('done', 'Выполнено'), ('skipped', 'Пропущено')], default='done',
+                              verbose_name='Статус')
     note = models.CharField(max_length=255, blank=True, verbose_name='Примечание')
     created_at = models.DateTimeField(auto_now_add=True, verbose_name='Дата создания')
     time_completed = models.TimeField(null=True, blank=True, verbose_name='Время выполнения')
@@ -206,9 +280,6 @@ class Reward(models.Model):
 
     def __str__(self) -> str:
         return f"Награда за «{self.habit.title}»: {self.description}"
-
-    # def get_queryset(self):
-    #     return super().get_queryset().filter(user=self.request.user)
 
     class Meta:
         verbose_name = "Награда"
@@ -258,7 +329,7 @@ class Notification(models.Model):
     )
 
     user: models.ForeignKey = models.ForeignKey(User, on_delete=models.CASCADE, related_name="notifications",
-                                               verbose_name="Пользователь")
+                                                verbose_name="Пользователь")
     habit: models.ForeignKey = models.ForeignKey(
         Habit,
         null=True,
@@ -266,16 +337,21 @@ class Notification(models.Model):
         on_delete=models.SET_NULL,
         related_name='notifications',
         verbose_name="Привычка")
-    message: str = models.TextField(verbose_name="Текст уведомления")
+    message: str = models.TextField(verbose_name="Текст уведомления", blank=True, null=True)
     sent_at: models.DateTimeField = models.DateTimeField(auto_now_add=True, verbose_name="Дата отправки")
     channel: str = models.CharField(
         max_length=20, choices=[('telegram', 'Telegram'), ('email', 'Email')],
         verbose_name='Канал'
     )
     notification_type: str = models.CharField(
-        max_length=20, choices=NOTIFICATION_TYPES, default='info', verbose_name="Тип уведомления"
+        max_length=20, choices=NOTIFICATION_TYPES, verbose_name="Тип уведомления", blank=True, null=True
     )
-    notification_title: str = models.CharField(max_length=255, blank=True, verbose_name="Заголовок уведомления")
+    notification_title: str = models.CharField(
+        max_length=255,
+        blank=True,
+        null=True,
+        verbose_name="Заголовок уведомления"
+    )
 
     def __str__(self) -> str:
         return f"[{self.sent_at.strftime('%d.%m.%Y %H:%M')}] {self.user.username}: {self.message[:30]}..."

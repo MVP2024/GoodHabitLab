@@ -1,7 +1,7 @@
 from django.contrib import admin
-from .models import HabitCategory, HabitLog, Reward, Notification
-from .models import Habit
+
 from .forms import HabitAdminForm
+from .models import Habit, HabitCategory, HabitLog, Notification, Reward
 
 
 @admin.register(Habit)

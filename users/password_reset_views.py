@@ -1,12 +1,14 @@
 from django.contrib.auth.forms import PasswordResetForm
 from django.contrib.auth.views import PasswordResetView
 from django.urls import reverse_lazy
-from drf_spectacular.utils import extend_schema, OpenApiExample, OpenApiParameter, OpenApiResponse
+from drf_spectacular.utils import (OpenApiExample, OpenApiParameter,
+                                   OpenApiResponse, extend_schema)
 from rest_framework import generics, status
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
-
-from .serializers import PasswordResetConfirmSerializer, PasswordResetRequestSerializer
+from users.models import User
+from .serializers import (PasswordResetConfirmSerializer,
+                          PasswordResetRequestSerializer)
 
 
 class APIRootView(generics.GenericAPIView):

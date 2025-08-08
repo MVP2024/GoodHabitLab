@@ -1,5 +1,7 @@
 from django.contrib.auth.models import AbstractUser, BaseUserManager
 from django.db import models
+from django.db.models.signals import post_save
+from django.dispatch import receiver
 
 
 class CustomUserManager(BaseUserManager):
@@ -14,7 +16,7 @@ class CustomUserManager(BaseUserManager):
         """
         if not email:
             raise ValueError("Поле Email должно быть заполнено")
-        email = self.normalize_email(email)
+        email = self.normalize_email(email).lower()
         user = self.model(email=email, **extra_fields)
         user.set_password(password)
         user.save(using=self._db)
@@ -36,14 +38,20 @@ class CustomUserManager(BaseUserManager):
         return self.create_user(email, password, **extra_fields)
 
 
+class AdminManager(CustomUserManager):
+    def get_queryset(self, *args, **kwargs):
+        return super().get_queryset(*args, **kwargs).filter(is_staff=True)
+
+
 class User(AbstractUser):
     telegram_chat_id = models.CharField(
-        max_length=100, blank=True, null=True, verbose_name="Telegram Chat ID", help_text="Укажите свой Telegram Chat ID"
+        max_length=100, blank=True, null=True, unique=True, verbose_name="Telegram Chat ID", help_text="Укажите свой Telegram Chat ID"
     )
     email = models.EmailField(
         unique=True, blank=False, null=False, verbose_name="Email", help_text="Укажите свой Email"
     )
-    last_active = models.DateTimeField(null=True, blank=True, verbose_name='Последняя активность', help_text="Дата и время последней активности пользователя")
+    last_active = models.DateTimeField(null=True, blank=True, verbose_name='Последняя активность',
+                                       help_text="Дата и время последней активности пользователя")
     username = None  # Устанавливаем username в None
     phone = models.CharField(
         max_length=35,
@@ -63,14 +71,12 @@ class User(AbstractUser):
     USERNAME_FIELD = "email"
     REQUIRED_FIELDS = []
 
-    objects = CustomUserManager()  # Применяем кастомный менеджер
-
-    class Meta:
-        verbose_name = "Пользователь"
-        verbose_name_plural = "Пользователи"
+    objects = CustomUserManager()
 
 
 class Admin(User):
+    objects = AdminManager()
+
     class Meta:
         proxy = True
         verbose_name = "Администратор"
@@ -84,26 +90,26 @@ class UserProfile(models.Model):
         ("weekly", "Раз в неделю"),
     ]
     user = models.OneToOneField(User, on_delete=models.CASCADE)
-    nickname = models.CharField(
-        max_length=150,
-        blank=True,
-        null=True,
-        unique=True,  # Если никнейм должен быть уникальным
-        verbose_name="Никнейм",
-        help_text="Ваш отображаемый никнейм"
-    )
-    # avatar = models.ImageField(upload_to='avatars/', blank=True, null=True) # Удаляем, т.к. перенесено в User
     bio = models.TextField(blank=True)
     notify_email = models.BooleanField(default=True)
     notify_telegram = models.BooleanField(default=True)
-    streak = models.PositiveIntegerField(default=0, verbose_name="Текущий стрик", help_text="Количество дней подряд, когда пользователь выполнял задачи")
+    streak = models.PositiveIntegerField(default=0, verbose_name="Текущий стрик",
+                                         help_text="Количество дней подряд, когда пользователь выполнял задачи")
     rewards_count = models.PositiveIntegerField(default=0)
     last_login_ip = models.GenericIPAddressField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     reminder_frequency = models.CharField(max_length=10, choices=REMINDER_CHOICES, default='never',
                                           verbose_name="Частота напоминаний", help_text="Выберите частоту напоминаний")
-    reminder_time = models.TimeField(blank=True, null=True, verbose_name="Время напоминания", help_text="Укажите время напоминания")
+    reminder_time = models.TimeField(blank=True, null=True, verbose_name="Время напоминания",
+                                     help_text="Укажите время напоминания")
 
     class Meta:
         verbose_name = "Профиль пользователя"
         verbose_name_plural = "Профили пользователей"
+
+
+@receiver(post_save, sender=User)
+def create_or_update_user_profile(sender, instance, created, **kwargs):
+    if created:
+        UserProfile.objects.create(user=instance)
+    instance.userprofile.save()
