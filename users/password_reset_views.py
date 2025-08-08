@@ -6,7 +6,9 @@ from drf_spectacular.utils import (OpenApiExample, OpenApiParameter,
 from rest_framework import generics, status
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
+
 from users.models import User
+
 from .serializers import (PasswordResetConfirmSerializer,
                           PasswordResetRequestSerializer)
 

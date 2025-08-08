@@ -30,7 +30,7 @@ def send_congratulation_message(chat_id: str, text: str) -> None:
 @shared_task
 def poll_inactive_users() -> None:
     """
-        Оповещает пользователей, которые за последние Х дней не были активны( у кого имеется .
+        Оповещает пользователей, которые за последние Х дней не были активны (у кого имеется telegram_chat_id).
         Подразумевает наличие у модели User поля `last_active`.
     """
     inactive_days = 7

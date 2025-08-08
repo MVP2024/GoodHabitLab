@@ -1,5 +1,6 @@
 from django.core.exceptions import ValidationError
 from rest_framework import serializers
+
 from users.models import User
 
 from .models import Habit, HabitCategory, HabitLog, Notification, Reward

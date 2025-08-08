@@ -2,7 +2,6 @@ import os
 
 from celery import Celery
 
-
 # Устанавливаем переменную окружения по умолчанию для настроек Django.
 # Это необходимо, чтобы Celery мог получить доступ к вашим настройкам Django.
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'config.settings')

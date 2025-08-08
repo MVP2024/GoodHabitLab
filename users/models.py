@@ -1,3 +1,5 @@
+from typing import Any
+
 from django.contrib.auth.models import AbstractUser, BaseUserManager
 from django.db import models
 from django.db.models.signals import post_save
@@ -39,7 +41,7 @@ class CustomUserManager(BaseUserManager):
 
 
 class AdminManager(CustomUserManager):
-    def get_queryset(self, *args, **kwargs):
+    def get_queryset(self, *args: Any, **kwargs: Any) -> models.QuerySet[Any]:
         return super().get_queryset(*args, **kwargs).filter(is_staff=True)
 
 
@@ -109,7 +111,7 @@ class UserProfile(models.Model):
 
 
 @receiver(post_save, sender=User)
-def create_or_update_user_profile(sender, instance, created, **kwargs):
+def create_or_update_user_profile(_sender: type[User], instance: User, created: bool, **_kwargs: dict) -> None:
     if created:
         UserProfile.objects.create(user=instance)
     instance.userprofile.save()
