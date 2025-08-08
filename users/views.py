@@ -1,42 +1,21 @@
 import logging
+
 from django.contrib.auth.models import AnonymousUser
 from drf_spectacular.utils import extend_schema, extend_schema_view
-from rest_framework import generics, mixins, status, viewsets
+from rest_framework import generics, mixins, serializers, status, viewsets
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework_simplejwt.authentication import JWTAuthentication
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
-from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
-from rest_framework import serializers
+from rest_framework_simplejwt.views import (TokenObtainPairView,
+                                            TokenRefreshView)
+
 from .models import User
-from .serializers import (
-    CustomUserRegistrationSerializer,
-    UserSerializer,
-    UserProfileUpdateSerializer,
-)
+from .serializers import (CustomTokenObtainPairSerializer,
+                          CustomUserRegistrationSerializer,
+                          UserProfileUpdateSerializer, UserSerializer)
 
 logger = logging.getLogger(__name__)
-
-
-class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
-    username_field = "email"
-
-    def validate(self, attrs):
-        email = attrs.get("email")
-        logger.info(f"Попытка входа с email: {email}")
-        data = super().validate(attrs)
-        if not self.user.is_active:
-            logger.warning(f"Неактивный пользователь попытался войти: {email}")
-            raise serializers.ValidationError("Аккаунт не активен.")
-        data.update(
-            {
-                "id": self.user.id,
-                "email": self.user.email,
-                "telegram_chat_id": getattr(self.user, "telegram_chat_id", None),
-            }
-        )
-        logger.info(f"Успешный вход пользователя: {self.user.email}")
-        return data
 
 
 @extend_schema_view(
@@ -76,9 +55,6 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
 class CustomTokenObtainPairView(TokenObtainPairView):
     serializer_class = CustomTokenObtainPairSerializer
 
-    # def post(self, request, *args, **kwargs):
-    #     return super().post(request, *args, **kwargs)
-
 
 @extend_schema(
     summary="Регистрация нового пользователя (только email)",
@@ -92,18 +68,18 @@ class UserRegistrationAPIView(generics.CreateAPIView):
     serializer_class = CustomUserRegistrationSerializer
     permission_classes = [AllowAny]
 
-    # def create(self, request, *args, **kwargs) -> Response:
-    #     logger.info(f"Попытка регистрации пользователя с email: {request.data.get('email')}")
-    #     serializer = self.get_serializer(data=request.data)
-    #     serializer.is_valid(raise_exception=True)
-    #     self.perform_create(serializer)
-    #     headers = self.get_success_headers(serializer.data)
-    #     logger.info(f"Пользователь успешно зарегистрирован: {serializer.data.get('email')}")
-    #     return Response(
-    #         {"message": "Пользователь успешно зарегистрирован."},
-    #         status=status.HTTP_201_CREATED,
-    #         headers=headers,
-    #     )
+    def create(self, request, *args, **kwargs) -> Response:
+        logger.info(f"Попытка регистрации пользователя с email: {request.data.get('email')}")
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        self.perform_create(serializer)
+        headers = self.get_success_headers(serializer.data)
+        logger.info(f"Пользователь успешно зарегистрирован: {serializer.data.get('email')}")
+        return Response(
+            {"message": "Пользователь успешно зарегистрирован."},
+            status=status.HTTP_201_CREATED,
+            headers=headers,
+        )
 
 
 @extend_schema(
@@ -122,17 +98,22 @@ class UserProfileViewSet(viewsets.ReadOnlyModelViewSet, mixins.UpdateModelMixin)
     permission_classes = [IsAuthenticated]
     authentication_classes = [JWTAuthentication]
 
+    def get_object(self) -> User | AnonymousUser:
+        """
+        Возвращает объект пользователя, связанный с текущим запросом.
+        Для действия 'retrieve' возвращает текущего пользователя.
+        Для других действий (например, update/partial_update),
+        если они будут использоваться с конкретным pk, будет использоваться стандартное поведение.
+        """
+        if self.action == 'retrieve':
+            return self.request.user
+        return super().get_object()
+
     def get_queryset(self):
         """
         Переопределяем get_queryset, чтобы он всегда возвращал только текущего пользователя.
         """
-        return User.objects.filter(pk=self.request.user.pk)
-
-    def get_object(self) -> User | AnonymousUser:
-        """
-        Возвращает объект пользователя, связанный с текущим запросом.
-        """
-        return self.request.user
+        return User.objects.filter(pk=self.request.user.pk).order_by('id')
 
     def get_serializer_class(self):
         """
@@ -220,5 +201,4 @@ class CustomTokenRefreshView(TokenRefreshView):
     """
     Получение нового access-токена по refresh-токену.
     """
-
     authentication_classes = []
