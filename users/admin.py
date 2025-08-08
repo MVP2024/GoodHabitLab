@@ -16,13 +16,15 @@ class UserAdmin(admin.ModelAdmin):
     search_fields = ("email",)
     inlines = (UserProfileInline,)
 
-
-# @admin.register(Admin)
-# class AdminAdmin(admin.ModelAdmin):
-#     list_display = ("user", "notify_telegram", "reminder_frequency", "reminder_time", "streak", "rewards_count")
-#
-#     def get_queryset(self, request):
-#         return super().get_queryset(request).filter(is_staff=True)
+    def get_inline_instances(self, request, obj=None):
+        """
+        Возвращает экземпляры инлайнов для заданного объекта.
+        Создает UserProfile, если он отсутствует, перед отображением инлайна.
+        """
+        if obj:
+            # Проверяем, существует ли уже UserProfile для этого пользователя
+            UserProfile.objects.get_or_create(user=obj)
+        return super().get_inline_instances(request, obj)
 
 
 @admin.register(UserProfile)
