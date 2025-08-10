@@ -104,3 +104,5 @@ telegram_bot_token.txt
 
 # mypy
 .mypy_cache/
+
+.idea
