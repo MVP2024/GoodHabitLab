@@ -50,9 +50,6 @@ class HabitAdminForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        # Если это редактирование существующего объекта и периодичность 'daily',
-        # или если периодичность 'custom' и есть выбранные дни,
-        # устанавливаем initial для selected_weekdays.
         if self.instance and self.instance.periodicity == 'daily':
             # Если periodic_type 'daily', то selected_weekdays должны быть все дни
             self.initial['selected_weekdays'] = [day[0] for day in self.fields['selected_weekdays'].choices]

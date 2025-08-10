@@ -49,5 +49,4 @@ class RewardAdmin(admin.ModelAdmin):
 class NotificationAdmin(admin.ModelAdmin):
     list_display = ("user", "habit", "channel", "sent_at", "notification_type", "notification_title")
     list_filter = ("channel", "user", "notification_type")
-    # Добавляем notification_type для редактирования/создания в админке
     fields = ("user", "habit", "channel", "notification_type", "notification_title", "message")
